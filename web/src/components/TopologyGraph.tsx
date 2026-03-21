@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   ReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   Background,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   BackgroundVariant,
   type NodeProps,
 } from '@xyflow/react'
@@ -65,7 +67,11 @@ interface Props {
   topology: Topology
 }
 
-export function TopologyGraph({ topology }: Props) {
+// Inner component — must be inside ReactFlowProvider to use useReactFlow
+function TopologyInner({ topology }: Props) {
+  const { fitView } = useReactFlow()
+  const containerRef = useRef<HTMLDivElement>(null)
+
   const { rfNodes, rfEdges } = useMemo(() => {
     const entries = topology.nodes.filter(n => n.type === 'entry')
     const backends = topology.nodes.filter(n => n.type === 'backend')
@@ -109,6 +115,25 @@ export function TopologyGraph({ topology }: Props) {
   useEffect(() => { setNodes(rfNodes) }, [rfNodes])
   useEffect(() => { setEdges(rfEdges) }, [rfEdges])
 
+  // Re-fit whenever nodes change (data refresh)
+  useEffect(() => {
+    const timer = setTimeout(() => fitView({ padding: 0.3, duration: 200 }), 50)
+    return () => clearTimeout(timer)
+  }, [rfNodes, fitView])
+
+  // Re-fit on container resize (responsive layout changes)
+  const handleResize = useCallback(() => {
+    fitView({ padding: 0.3, duration: 200 })
+  }, [fitView])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(handleResize)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [handleResize])
+
   const nodeCount = Math.max(
     topology.nodes.filter(n => n.type === 'entry').length,
     topology.nodes.filter(n => n.type === 'backend').length,
@@ -116,7 +141,7 @@ export function TopologyGraph({ topology }: Props) {
   )
 
   return (
-    <div style={{ height: Math.max(nodeCount * 90 + 40, 160), borderRadius: 8, overflow: 'hidden' }}>
+    <div ref={containerRef} style={{ height: Math.max(nodeCount * 90 + 40, 160), borderRadius: 8, overflow: 'hidden' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -135,5 +160,13 @@ export function TopologyGraph({ topology }: Props) {
         <Background color="rgba(255,255,255,0.02)" variant={BackgroundVariant.Dots} gap={20} size={1} />
       </ReactFlow>
     </div>
+  )
+}
+
+export function TopologyGraph({ topology }: Props) {
+  return (
+    <ReactFlowProvider>
+      <TopologyInner topology={topology} />
+    </ReactFlowProvider>
   )
 }

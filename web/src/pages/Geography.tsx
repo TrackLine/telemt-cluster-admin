@@ -8,12 +8,6 @@ import type { GeoResponse } from '../api'
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
 
-const HOURS_OPTIONS = [
-  { value: 1, label: '1h' },
-  { value: 6, label: '6h' },
-  { value: 24, label: '24h' },
-]
-
 const MAP_W = 960
 const MAP_H = 500
 
@@ -39,7 +33,6 @@ type GeoFeature = { type: string; id?: string | number; geometry: object; proper
 
 export function Geography() {
   const [data, setData] = useState<GeoResponse | null>(null)
-  const [hours, setHours] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [topoFeatures, setTopoFeatures] = useState<GeoFeature[]>([])
@@ -98,11 +91,11 @@ export function Geography() {
   }, [])
 
   const load = useCallback(() => {
-    getGeoClients(hours)
+    getGeoClients()
       .then(res => { setData(res); setError(null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [hours])
+  }, [])
 
   useEffect(() => {
     setLoading(true); load()
@@ -167,15 +160,14 @@ export function Geography() {
             Client connection origins · MaxMind GeoIP
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: 3 }}>
-          {HOURS_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => setHours(opt.value)} style={{
-              padding: '5px 12px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-              background: hours === opt.value ? 'var(--ok)' : 'transparent',
-              color: hours === opt.value ? '#0d0d0d' : 'var(--text-muted)',
-              transition: 'all 0.15s',
-            }}>{opt.label}</button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 12px' }}>
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ok)', boxShadow: '0 0 0 2px rgba(74,222,128,0.25)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>Live</span>
+          {data?.last_updated && (
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              · {new Date(data.last_updated).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
         </div>
       </div>
 
@@ -247,10 +239,9 @@ export function Geography() {
 
       {/* Stat cards */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' as const }}>
-        <StatCard label="Total Connections" value={loading ? '—' : (data?.total_connections ?? 0)} />
+        <StatCard label="Online Now" value={loading ? '—' : (data?.total_connections ?? 0)} />
         <StatCard label="Countries" value={loading ? '—' : (data?.total_countries ?? 0)} />
         <StatCard label="Top Country" value={loading ? '—' : topCountry} />
-        <StatCard label="Window" value={`${hours}h`} />
       </div>
 
       {/* Map + optional side panel */}

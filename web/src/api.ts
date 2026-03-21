@@ -141,7 +141,8 @@ export interface GeoResponse {
   points: GeoPoint[]
   total_countries: number
   total_connections: number
+  last_updated: string | null
 }
 
-export const getGeoClients = (hours = 1) =>
-  req<GeoResponse>(`/geo/clients?hours=${hours}`)
+export const getGeoClients = () =>
+  req<GeoResponse>('/geo/clients')

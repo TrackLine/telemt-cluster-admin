@@ -3,7 +3,7 @@ package api
 import (
 	"log"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mshalenkov/telemt-cluster-admin/internal/db"
@@ -24,16 +24,11 @@ type GeoResponse struct {
 	Points           []GeoClientPoint `json:"points"`
 	TotalCountries   int              `json:"total_countries"`
 	TotalConnections int              `json:"total_connections"`
+	LastUpdated      *time.Time       `json:"last_updated"`
 }
 
 func GetGeoClients(c *gin.Context) {
-	hoursStr := c.DefaultQuery("hours", "1")
-	hours, _ := strconv.Atoi(hoursStr)
-	if hours < 1 || hours > 24 {
-		hours = 1
-	}
-
-	snapshots, err := db.GetGeoSummary(hours)
+	snapshots, err := db.GetCurrentGeo()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -41,6 +36,7 @@ func GetGeoClients(c *gin.Context) {
 
 	countries := map[string]struct{}{}
 	totalConns := 0
+	var lastUpdated *time.Time
 	points := make([]GeoClientPoint, 0, len(snapshots))
 	for _, s := range snapshots {
 		points = append(points, GeoClientPoint{
@@ -53,6 +49,10 @@ func GetGeoClients(c *gin.Context) {
 		})
 		countries[s.CountryCode] = struct{}{}
 		totalConns += s.Connections
+		if lastUpdated == nil || s.SampledAt.After(*lastUpdated) {
+			t := s.SampledAt
+			lastUpdated = &t
+		}
 	}
 
 	c.JSON(http.StatusOK, GeoResponse{
@@ -60,6 +60,7 @@ func GetGeoClients(c *gin.Context) {
 		Points:           points,
 		TotalCountries:   len(countries),
 		TotalConnections: totalConns,
+		LastUpdated:      lastUpdated,
 	})
 }
 

@@ -59,17 +59,20 @@ func InsertGeoSnapshots(snapshots []GeoSnapshot) error {
 	return tx.Commit()
 }
 
-// GetGeoSummary returns aggregated geo data from the last `hours` hours.
-func GetGeoSummary(hours int) ([]GeoSnapshot, error) {
-	since := time.Now().Add(-time.Duration(hours) * time.Hour)
+// GetCurrentGeo returns geo data from the most recent polling cycle only.
+// It looks at the latest sampled_at across all records and returns everything
+// within 30 seconds of that timestamp (covers 2 poll intervals at default 15s cadence).
+func GetCurrentGeo() ([]GeoSnapshot, error) {
 	rows, err := DB.Query(`
 		SELECT country_code, country_name, city, AVG(lat), AVG(lng), SUM(connections), MAX(sampled_at)
 		FROM geo_snapshots
-		WHERE sampled_at >= ?
+		WHERE sampled_at >= (
+			SELECT datetime(MAX(sampled_at), '-30 seconds') FROM geo_snapshots
+		)
 		GROUP BY country_code, city
 		ORDER BY SUM(connections) DESC
 		LIMIT 500
-	`, since)
+	`)
 	if err != nil {
 		return nil, err
 	}
