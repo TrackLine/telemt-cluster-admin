@@ -22,9 +22,9 @@ function getRadius(connections: number, maxConnections: number): number {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px', flex: 1, minWidth: 130 }}>
-      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{label}</div>
-      <div style={{ color: 'var(--text)', fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    <div className="stat-card" style={{ flex: 1, minWidth: 130 }}>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={{ fontSize: 22 }}>{value}</div>
     </div>
   )
 }
@@ -232,16 +232,14 @@ export function Geography() {
       )}
 
       {error && (
-        <div style={{ color: 'var(--down)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: 13 }}>
-          {error}
-        </div>
+        <div className="alert alert-down mb-4" style={{ fontSize: 13 }}>{error}</div>
       )}
 
       {/* Stat cards */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' as const }}>
-        <StatCard label="Online Now" value={loading ? '—' : (data?.total_connections ?? 0)} />
-        <StatCard label="Countries" value={loading ? '—' : (data?.total_countries ?? 0)} />
-        <StatCard label="Top Country" value={loading ? '—' : topCountry} />
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 20 }}>
+        <StatCard label="Online Now"   value={loading ? '—' : (data?.total_connections ?? 0)} />
+        <StatCard label="Countries"    value={loading ? '—' : (data?.total_countries ?? 0)} />
+        <StatCard label="Top Country"  value={loading ? '—' : topCountry} />
       </div>
 
       {/* Map + optional side panel */}

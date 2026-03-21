@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mshalenkov/telemt-cluster-admin/internal/api"
+	"github.com/mshalenkov/telemt-cluster-admin/internal/auth"
 	"github.com/mshalenkov/telemt-cluster-admin/internal/db"
 	"github.com/mshalenkov/telemt-cluster-admin/internal/geo"
 	"github.com/mshalenkov/telemt-cluster-admin/internal/poller"
@@ -42,6 +43,13 @@ func main() {
 	poller.Start(pollInterval)
 	log.Printf("poller started (interval: %s)", pollInterval)
 
+	auth.Init()
+	if auth.Enabled() {
+		log.Printf("auth: enabled (user: %s)", os.Getenv("ADMIN_USER"))
+	} else {
+		log.Printf("auth: disabled (set ADMIN_PASSWORD to enable)")
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -59,25 +67,35 @@ func main() {
 
 	v1 := r.Group("/api")
 	{
-		v1.GET("/nodes/backends", api.ListBackendNodes)
-		v1.POST("/nodes/backends", api.CreateBackendNode)
-		v1.PATCH("/nodes/backends/:id", api.PatchBackendNode)
-		v1.DELETE("/nodes/backends/:id", api.DeleteBackendNode)
-		v1.POST("/nodes/backends/test", api.TestBackendNode)
+		// Public endpoints — no middleware
+		v1.GET("/auth/status", api.AuthStatus)
+		v1.POST("/auth/login", api.AuthLogin)
+		v1.POST("/auth/logout", api.AuthLogout)
+		v1.GET("/config", api.GetConfig)
 
-		v1.GET("/nodes/entries", api.ListEntryNodes)
-		v1.POST("/nodes/entries", api.CreateEntryNode)
-		v1.PATCH("/nodes/entries/:id", api.PatchEntryNode)
-		v1.DELETE("/nodes/entries/:id", api.DeleteEntryNode)
-		v1.POST("/nodes/entries/test", api.TestEntryNode)
+		// Protected routes
+		protected := v1.Group("/", api.AuthMiddleware())
+		{
+			protected.GET("/nodes/backends", api.ListBackendNodes)
+			protected.POST("/nodes/backends", api.CreateBackendNode)
+			protected.PATCH("/nodes/backends/:id", api.PatchBackendNode)
+			protected.DELETE("/nodes/backends/:id", api.DeleteBackendNode)
+			protected.POST("/nodes/backends/test", api.TestBackendNode)
 
-		v1.GET("/cluster/summary", api.ClusterSummary)
-		v1.GET("/cluster/topology", api.ClusterTopology)
-		v1.GET("/metrics/:node_id", api.GetMetrics)
+			protected.GET("/nodes/entries", api.ListEntryNodes)
+			protected.POST("/nodes/entries", api.CreateEntryNode)
+			protected.PATCH("/nodes/entries/:id", api.PatchEntryNode)
+			protected.DELETE("/nodes/entries/:id", api.DeleteEntryNode)
+			protected.POST("/nodes/entries/test", api.TestEntryNode)
 
-		v1.GET("/geo/clients", api.GetGeoClients)
-		v1.GET("/geo/status", api.GetGeoStatus)
-		v1.POST("/geo/update", api.TriggerGeoUpdate)
+			protected.GET("/cluster/summary", api.ClusterSummary)
+			protected.GET("/cluster/topology", api.ClusterTopology)
+			protected.GET("/metrics/:node_id", api.GetMetrics)
+
+			protected.GET("/geo/clients", api.GetGeoClients)
+			protected.GET("/geo/status", api.GetGeoStatus)
+			protected.POST("/geo/update", api.TriggerGeoUpdate)
+		}
 	}
 
 	// Serve SPA — embedded frontend

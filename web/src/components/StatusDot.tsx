@@ -1,9 +1,9 @@
 import type { NodeStatus } from '../api'
 
 const colors: Record<NodeStatus, string> = {
-  ok: 'var(--ok)',
-  warn: 'var(--warn)',
-  down: 'var(--down)',
+  ok:      'var(--ok)',
+  warn:    'var(--warn)',
+  down:    'var(--down)',
   unknown: 'var(--unknown)',
 }
 
@@ -14,19 +14,25 @@ interface Props {
 }
 
 export function StatusDot({ status, pulse = false, size = 7 }: Props) {
-  const color = colors[status]
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: color,
-        flexShrink: 0,
-        boxShadow: pulse && status === 'ok' ? `0 0 0 2px ${color}33` : undefined,
-        animation: pulse && status === 'ok' ? 'pulse 2s infinite' : undefined,
-      }}
-    />
+    <span style={{
+      display: 'inline-block',
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: colors[status],
+      flexShrink: 0,
+      animation: pulse && status === 'ok' ? 'pulse-ring 2.5s ease-out infinite' : undefined,
+    }} />
+  )
+}
+
+export function StatusBadge({ status }: { status: NodeStatus }) {
+  const cls = status === 'ok' ? 'badge-ok' : status === 'warn' ? 'badge-warn' : status === 'down' ? 'badge-down' : 'badge-neutral'
+  return (
+    <span className={`badge ${cls}`}>
+      <StatusDot status={status} size={6} />
+      {status.toUpperCase()}
+    </span>
   )
 }

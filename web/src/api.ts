@@ -146,3 +146,32 @@ export interface GeoResponse {
 
 export const getGeoClients = () =>
   req<GeoResponse>('/geo/clients')
+
+// ── App config ───────────────────────────────────────────────────────────────
+
+export interface AppConfig {
+  cluster_mode: 'simple' | 'full'
+}
+
+export const getAppConfig = () =>
+  req<AppConfig>('/config')
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+
+export interface AuthStatus {
+  enabled: boolean
+  authenticated: boolean
+}
+
+export const getAuthStatus = () =>
+  req<AuthStatus>('/auth/status')
+
+export const authLogin = (username: string, password: string) =>
+  req<{ ok: boolean }>('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+
+export const authLogout = () =>
+  req<{ ok: boolean }>('/auth/logout', { method: 'POST' })

@@ -14,9 +14,12 @@ services:
       - POLL_INTERVAL=${POLL_INTERVAL:-15s}
       - GEOIP_DB=/data/GeoLite2-City.mmdb
       - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY:-}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - CLUSTER_MODE=${CLUSTER_MODE:-full}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/cluster/summary"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/auth/status"]
       interval: 30s
       timeout: 5s
       retries: 3
