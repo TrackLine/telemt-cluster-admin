@@ -1,4 +1,4 @@
-# Proxy admin
+# Telemt Cluster Admin
 
 <p>
   <a href="#english">English</a> · <a href="#русский">Русский</a>
@@ -60,6 +60,24 @@ ADMIN_PASSWORD=
 # GeoIP — get a free key at maxmind.com/en/geolite2/signup
 # DB (~60 MB) auto-downloads on first start, updates weekly
 MAXMIND_LICENSE_KEY=
+```
+
+### telemt API setup
+
+The panel uses the telemt HTTP control plane API. Enable it in `telemt.toml` on each backend node:
+
+```toml
+[server.api]
+enabled = true
+listen = "0.0.0.0:9091"      # bind to all interfaces so the panel can reach it
+whitelist = ["<PANEL_IP>/32"] # restrict access to the panel host only
+```
+
+> See [telemt Quick Start Guide](https://github.com/telemt/telemt/blob/main/docs/QUICK_START_GUIDE.ru.md) for full configuration reference.
+
+After editing, restart telemt and verify:
+```bash
+curl http://<NODE_IP>:9091/v1/health
 ```
 
 ### Adding nodes
@@ -178,6 +196,24 @@ ADMIN_PASSWORD=
 # GeoIP — бесплатный ключ на maxmind.com/en/geolite2/signup
 # БД (~60 МБ) скачается автоматически при первом запуске, обновляется раз в неделю
 MAXMIND_LICENSE_KEY=
+```
+
+### Настройка API на telemt
+
+Панель использует HTTP API telemt (control plane). Включи его в `telemt.toml` на каждой backend-ноде:
+
+```toml
+[server.api]
+enabled = true
+listen = "0.0.0.0:9091"       # принимать подключения со всех интерфейсов
+whitelist = ["<IP_ПАНЕЛИ>/32"] # разрешить доступ только с IP панели
+```
+
+> Полный гайд по настройке: [QUICK_START_GUIDE.ru.md](https://github.com/telemt/telemt/blob/main/docs/QUICK_START_GUIDE.ru.md)
+
+После изменений перезапусти telemt и проверь:
+```bash
+curl http://<IP_НОДЫ>:9091/v1/health
 ```
 
 ### Добавление нод

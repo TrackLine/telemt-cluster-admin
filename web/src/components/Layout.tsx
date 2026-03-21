@@ -29,7 +29,7 @@ export function Layout({ children, onLogout }: Props) {
         <div className="sidebar-logo">
           <div className="sidebar-brand">
             <Activity size={15} color="var(--ok)" strokeWidth={2.5} />
-            Proxy admin
+            Telemt Cluster Admin
           </div>
           <div className="sidebar-sub">MTProto monitor</div>
         </div>
@@ -59,7 +59,7 @@ export function Layout({ children, onLogout }: Props) {
         {/* Mobile top bar */}
         <div className="mobile-topbar">
           <Activity size={14} color="var(--ok)" strokeWidth={2.5} />
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Proxy admin</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>Telemt Cluster Admin</span>
           <span className="text-muted" style={{ fontSize: 11 }}>· MTProto</span>
           <button
             onClick={handleLogout}

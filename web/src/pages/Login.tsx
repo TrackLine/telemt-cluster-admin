@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { Activity } from 'lucide-react'
 import { authLogin } from '../api'
 
@@ -35,7 +36,7 @@ export function Login({ onSuccess }: Props) {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Activity size={20} color="var(--ok)" strokeWidth={2.5} />
-            <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.4px' }}>Proxy admin</span>
+            <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.4px' }}>Telemt Cluster Admin</span>
           </div>
           <div className="text-muted" style={{ fontSize: 13 }}>MTProto monitor</div>
         </div>
