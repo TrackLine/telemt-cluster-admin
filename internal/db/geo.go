@@ -4,6 +4,25 @@ import (
 	"time"
 )
 
+// timeFormats that mattn/go-sqlite3 may use when storing time values.
+var sqliteTimeFormats = []string{
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02T15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05Z07:00",
+	"2006-01-02 15:04:05",
+}
+
+func parseTime(s string) time.Time {
+	for _, f := range sqliteTimeFormats {
+		if t, err := time.Parse(f, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 // GeoSnapshot represents a resolved country/city with connection count at a point in time.
 type GeoSnapshot struct {
 	CountryCode string
@@ -58,9 +77,11 @@ func GetGeoSummary(hours int) ([]GeoSnapshot, error) {
 	var result []GeoSnapshot
 	for rows.Next() {
 		var s GeoSnapshot
-		if err := rows.Scan(&s.CountryCode, &s.CountryName, &s.City, &s.Lat, &s.Lng, &s.Connections, &s.SampledAt); err != nil {
+		var sampledAtStr string
+		if err := rows.Scan(&s.CountryCode, &s.CountryName, &s.City, &s.Lat, &s.Lng, &s.Connections, &sampledAtStr); err != nil {
 			return nil, err
 		}
+		s.SampledAt = parseTime(sampledAtStr)
 		result = append(result, s)
 	}
 	return result, nil
