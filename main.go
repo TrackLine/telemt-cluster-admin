@@ -86,11 +86,15 @@ func main() {
 		log.Fatalf("embed sub: %v", err)
 	}
 	fileServer := http.FileServer(http.FS(distFS))
+	indexHTML, err := fs.ReadFile(distFS, "index.html")
+	if err != nil {
+		log.Fatalf("embed index.html: %v", err)
+	}
 	r.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path[1:] // strip leading /
 		if _, err := fs.Stat(distFS, path); err != nil {
 			// SPA fallback: serve index.html for client-side routing
-			c.FileFromFS("index.html", http.FS(distFS))
+			c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 			return
 		}
 		fileServer.ServeHTTP(c.Writer, c.Request)
