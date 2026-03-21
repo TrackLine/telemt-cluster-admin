@@ -140,6 +140,10 @@ cd web && npm install && npm run dev
 
 Go · Gin · SQLite · React 19 · TypeScript · Vite 8 · Recharts · d3-geo · Docker
 
+### Support
+
+If this project is useful to you — [buy me a coffee ☕](https://shalenkov.dev/about/)
+
 ---
 
 <h2 id="русский">Русский</h2>
@@ -275,3 +279,7 @@ cd web && npm install && npm run dev
 ### Стек
 
 Go · Gin · SQLite · React 19 · TypeScript · Vite 8 · Recharts · d3-geo · Docker
+
+### Поддержать проект
+
+Если проект оказался полезным — [угости кофе ☕](https://shalenkov.dev/about/)
