@@ -1,0 +1,19 @@
+# Git
+.git
+.gitignore
+
+# Dev artifacts
+web/node_modules
+web/.vite
+data/*.db
+data/*.mmdb
+
+# Docs
+*.md
+README*
+
+# Local env
+.env
+
+# Go dev
+*.test

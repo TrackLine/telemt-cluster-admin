@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - DB_PATH=/data/cluster.db
+      - PORT=3000
+      - POLL_INTERVAL=${POLL_INTERVAL:-15s}
+      - GEOIP_DB=/data/GeoLite2-City.mmdb
+      - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/cluster/summary"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
