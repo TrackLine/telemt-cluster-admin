@@ -7,85 +7,117 @@ import (
 	"time"
 )
 
+var httpClient = &http.Client{Timeout: 5 * time.Second}
+
+// telemt REST API wraps every response in this envelope.
+type apiEnvelope[T any] struct {
+	OK   bool   `json:"ok"`
+	Data T      `json:"data"`
+	Err  any    `json:"error"` // string or object on failure
+}
+
+// /v1/stats/me-writers
+type meWritersData struct {
+	Summary struct {
+		CoveragePct  float64 `json:"coverage_pct"`
+		AliveWriters int     `json:"alive_writers"`
+	} `json:"summary"`
+	Writers []struct {
+		State string `json:"state"` // "alive", "draining", "degraded", …
+	} `json:"writers"`
+}
+
+// /v1/users — array of UserInfo
+type telemetUserInfo struct {
+	CurrentConnections int      `json:"current_connections"`
+	TotalOctets        int64    `json:"total_octets"`
+	ActiveUniqueIPs    []string `json:"active_unique_ips_list"`
+}
+
+// Canonical types used by the scheduler.
 type telemetMeWriters struct {
-	CoveragePct  float64 `json:"coverage_pct"`
-	AliveWriters int     `json:"alive_writers"`
-	Draining     bool    `json:"draining"`
+	CoveragePct  float64
+	AliveWriters int
+	Draining     bool
 }
 
 type telemetEdge struct {
-	LiveConnections int   `json:"live_connections"`
-	BytesIn         int64 `json:"bytes_in"`
-	BytesOut        int64 `json:"bytes_out"`
+	LiveConnections int
+	TotalBytes      int64    // total_octets summed across all users
+	ClientIPs       []string // deduplicated active IPs for geo lookup
 }
-
-var httpClient = &http.Client{Timeout: 5 * time.Second}
 
 // FetchTelemetStats fetches live stats from a telemt node's REST API.
 func FetchTelemetStats(hostname string, port int) (*telemetMeWriters, *telemetEdge, error) {
 	base := fmt.Sprintf("http://%s:%d", hostname, port)
 
-	mw, err := fetchJSON[telemetMeWriters](base + "/v1/stats/me-writers")
+	// 1. /v1/stats/me-writers — coverage & writer health
+	mwEnv, err := fetchEnvelope[meWritersData](base + "/v1/stats/me-writers")
 	if err != nil {
 		return nil, nil, fmt.Errorf("me-writers: %w", err)
 	}
 
-	edge, err := fetchJSON[telemetEdge](base + "/v1/runtime/edge")
+	draining := false
+	for _, w := range mwEnv.Writers {
+		if w.State == "draining" {
+			draining = true
+			break
+		}
+	}
+
+	mw := &telemetMeWriters{
+		CoveragePct:  mwEnv.Summary.CoveragePct,
+		AliveWriters: mwEnv.Summary.AliveWriters,
+		Draining:     draining,
+	}
+
+	// 2. /v1/users — live connections, bytes, client IPs
+	usersEnv, err := fetchEnvelope[[]telemetUserInfo](base + "/v1/users")
 	if err != nil {
-		return nil, nil, fmt.Errorf("runtime/edge: %w", err)
+		return nil, nil, fmt.Errorf("users: %w", err)
+	}
+
+	edge := &telemetEdge{}
+	seenIPs := map[string]struct{}{}
+	for _, u := range usersEnv {
+		edge.LiveConnections += u.CurrentConnections
+		edge.TotalBytes += u.TotalOctets
+		for _, ip := range u.ActiveUniqueIPs {
+			if _, ok := seenIPs[ip]; !ok {
+				seenIPs[ip] = struct{}{}
+				edge.ClientIPs = append(edge.ClientIPs, ip)
+			}
+		}
 	}
 
 	return mw, edge, nil
 }
 
-func fetchJSON[T any](url string) (*T, error) {
+// fetchEnvelope GETs a URL and decodes the telemt API envelope,
+// returning the inner Data field or an error.
+func fetchEnvelope[T any](url string) (T, error) {
+	var zero T
 	resp, err := httpClient.Get(url)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return zero, fmt.Errorf("status %d", resp.StatusCode)
 	}
-	var v T
-	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
-		return nil, err
+
+	var env apiEnvelope[T]
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+		return zero, fmt.Errorf("decode: %w", err)
 	}
-	return &v, nil
+	if !env.OK {
+		return zero, fmt.Errorf("api error: %v", env.Err)
+	}
+	return env.Data, nil
 }
 
-// TelemetConnection represents a single live connection from the telemt connections endpoint.
+// TelemetConnection is kept for compatibility but populated from /v1/users IPs now.
 type TelemetConnection struct {
-	RemoteAddr string `json:"remote_addr"`
-	DC         int    `json:"dc"`
-	BytesIn    int64  `json:"bytes_in"`
-	BytesOut   int64  `json:"bytes_out"`
-}
-
-// TelemetConnectionsResp is the response from /v1/runtime/connections.
-type TelemetConnectionsResp struct {
-	Connections []TelemetConnection `json:"connections"`
-}
-
-// FetchTelemetConnections tries to get the live connections list from a telemt node.
-// Returns nil, nil if the endpoint doesn't exist (404) — this is not an error.
-func FetchTelemetConnections(hostname string, port int) ([]TelemetConnection, error) {
-	url := fmt.Sprintf("http://%s:%d/v1/runtime/connections", hostname, port)
-	resp, err := httpClient.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusNotFound {
-		// endpoint not supported by this telemt version
-		return nil, nil
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("connections: status %d", resp.StatusCode)
-	}
-	var r TelemetConnectionsResp
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return nil, err
-	}
-	return r.Connections, nil
+	RemoteAddr string
 }

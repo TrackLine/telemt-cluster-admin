@@ -2,7 +2,6 @@ package poller
 
 import (
 	"log"
-	"net"
 	"time"
 
 	"github.com/mshalenkov/telemt-cluster-admin/internal/db"
@@ -63,36 +62,26 @@ func pollBackends() {
 				n.AliveWriters = mw.AliveWriters
 				n.Draining = mw.Draining
 				n.LiveConnections = edge.LiveConnections
-				n.BytesIn = edge.BytesIn
-				n.BytesOut = edge.BytesOut
+				n.BytesIn = edge.TotalBytes
+				n.BytesOut = 0
 				n.Status = coverageStatus(mw.CoveragePct, mw.Draining)
 
 				// Record metric samples
 				for _, s := range []models.MetricSample{
 					{NodeID: n.ID, NodeType: "backend", MetricName: "live_connections", Value: float64(edge.LiveConnections), SampledAt: now},
 					{NodeID: n.ID, NodeType: "backend", MetricName: "coverage_pct", Value: mw.CoveragePct, SampledAt: now},
-					{NodeID: n.ID, NodeType: "backend", MetricName: "bytes_in", Value: float64(edge.BytesIn), SampledAt: now},
-					{NodeID: n.ID, NodeType: "backend", MetricName: "bytes_out", Value: float64(edge.BytesOut), SampledAt: now},
+					{NodeID: n.ID, NodeType: "backend", MetricName: "bytes_total", Value: float64(edge.TotalBytes), SampledAt: now},
 				} {
 					if err := db.InsertMetricSample(s); err != nil {
 						log.Printf("[poller] insert sample: %v", err)
 					}
 				}
-			}
 
-			// Try to collect client geo data
-			if geo.Available() {
-				conns, err := FetchTelemetConnections(n.Hostname, n.APIPort)
-				if err == nil && len(conns) > 0 {
-					var snapshots []db.GeoSnapshot
+				// Collect client geo data from active user IPs
+				if geo.Available() && len(edge.ClientIPs) > 0 {
 					countryCounts := map[string]*db.GeoSnapshot{}
-					for _, conn := range conns {
-						// Extract IP from "1.2.3.4:port" format
-						host, _, splitErr := net.SplitHostPort(conn.RemoteAddr)
-						if splitErr != nil {
-							host = conn.RemoteAddr
-						}
-						info := geo.Lookup(host)
+					for _, ip := range edge.ClientIPs {
+						info := geo.Lookup(ip)
 						if info == nil {
 							continue
 						}
@@ -112,10 +101,13 @@ func pollBackends() {
 							}
 						}
 					}
+					var snapshots []db.GeoSnapshot
 					for _, s := range countryCounts {
 						snapshots = append(snapshots, *s)
 					}
-					db.InsertGeoSnapshots(snapshots)
+					if len(snapshots) > 0 {
+						db.InsertGeoSnapshots(snapshots)
+					}
 				}
 			}
 
