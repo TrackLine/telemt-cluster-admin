@@ -18,15 +18,63 @@ const FLAGS: Record<string, string> = {
   FI:'🇫🇮', US:'🇺🇸', GB:'🇬🇧', PL:'🇵🇱', CZ:'🇨🇿',
 }
 
-function StatCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: '0.75em', height: '0.75em', marginRight: '0.2em', verticalAlign: 'middle', opacity: 0.7 }}>
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  )
+}
+
+function StatCard({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color?: string; icon?: boolean }) {
   return (
     <div className="stat-card">
       <div className="stat-label">{label}</div>
-      <div className="stat-value" style={color ? { color } : undefined}>{value}</div>
+      <div className="stat-value" style={{ ...(color ? { color } : {}), display: 'flex', alignItems: 'center', gap: 6 }}>
+        {icon && <TelegramIcon />}{value}
+      </div>
       {sub && <div className="stat-sub">{sub}</div>}
     </div>
   )
 }
+
+function ConnectionSplit({ summary }: { summary: ClusterSummary }) {
+  const direct = summary.direct_connections ?? 0
+  const me = summary.me_connections ?? 0
+  if (direct === 0 && me === 0) return null
+  const total = direct + me
+  const directPct = total > 0 ? Math.round((direct / total) * 100) : 0
+  const mePct = 100 - directPct
+  return (
+    <div className="card" style={{ marginBottom: 20, padding: '14px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <span className="stat-label" style={{ marginBottom: 0, minWidth: 120 }}>Connection type</span>
+        <div style={{ display: 'flex', flex: 1, gap: 20, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', flexShrink: 0 }} />
+            <span className="text-muted" style={{ fontSize: 12 }}>ME</span>
+            <span className="font-mono" style={{ fontSize: 13, fontWeight: 600 }}>{me.toLocaleString()}</span>
+            <span className="text-muted" style={{ fontSize: 11 }}>({mePct}%)</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#60a5fa', flexShrink: 0 }} />
+            <span className="text-muted" style={{ fontSize: 12 }}>Direct</span>
+            <span className="font-mono" style={{ fontSize: 13, fontWeight: 600 }}>{direct.toLocaleString()}</span>
+            <span className="text-muted" style={{ fontSize: 11 }}>({directPct}%)</span>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{ flex: '0 0 160px', height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', height: '100%' }}>
+            <div style={{ width: `${mePct}%`, background: 'var(--ok)', transition: 'width 0.3s' }} />
+            <div style={{ width: `${directPct}%`, background: '#60a5fa', transition: 'width 0.3s' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 export function Dashboard() {
   const [summary, setSummary] = useState<ClusterSummary | null>(null)
@@ -36,7 +84,10 @@ export function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, t] = await Promise.all([getClusterSummary(), getClusterTopology()])
+        const [s, t] = await Promise.all([
+          getClusterSummary(),
+          getClusterTopology(),
+        ])
         setSummary(s)
         setTopology(t)
       } catch {}
@@ -60,7 +111,7 @@ export function Dashboard() {
 
       {/* Stat cards */}
       <div className="stat-grid">
-        <StatCard label="Live Connections" value={(summary?.total_live_connections ?? 0).toLocaleString()} />
+        <StatCard label="Live Connections" value={(summary?.total_live_connections ?? 0).toLocaleString()} icon />
         <StatCard
           label="Nodes Online"
           value={`${summary?.nodes_online ?? 0} / ${summary?.nodes_total ?? 0}`}
@@ -77,6 +128,9 @@ export function Dashboard() {
           sub="↑ + ↓ total"
         />
       </div>
+
+      {/* Connection type split */}
+      {summary && <ConnectionSplit summary={summary} />}
 
       {/* Topology */}
       {topology && (

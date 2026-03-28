@@ -16,6 +16,17 @@ export interface BackendNode {
   draining: boolean
   bytes_in: number
   bytes_out: number
+  // Extended stats
+  direct_connections: number
+  me_connections: number
+  handshake_timeouts: number
+  uptime_seconds: number
+  accepting_connections: boolean
+  read_only: boolean
+  latency_lte_100ms: number
+  latency_101_500ms: number
+  latency_501_1000ms: number
+  latency_gt_1000ms: number
 }
 
 export interface EntryNode {
@@ -43,6 +54,8 @@ export interface ClusterSummary {
   avg_coverage_pct: number
   total_bytes_in: number
   total_bytes_out: number
+  direct_connections: number
+  me_connections: number
 }
 
 export interface TopologyNode {

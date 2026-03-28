@@ -12,43 +12,60 @@ const (
 )
 
 type BackendNode struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Hostname    string     `json:"hostname"`
-	Region      string     `json:"region"`
-	APIPort     int        `json:"api_port"`
-	Enabled     bool       `json:"enabled"`
-	Status      NodeStatus `json:"status"`
-	LastPolled  *time.Time `json:"last_polled_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Hostname   string     `json:"hostname"`
+	Region     string     `json:"region"`
+	APIPort    int        `json:"api_port"`
+	Enabled    bool       `json:"enabled"`
+	Status     NodeStatus `json:"status"`
+	LastPolled *time.Time `json:"last_polled_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 
-	// Cached metrics
+	// From /v1/stats/me-writers + /v1/users
 	LiveConnections int     `json:"live_connections"`
 	CoveragePct     float64 `json:"coverage_pct"`
 	AliveWriters    int     `json:"alive_writers"`
 	Draining        bool    `json:"draining"`
 	BytesIn         int64   `json:"bytes_in"`
 	BytesOut        int64   `json:"bytes_out"`
+
+	// From /v1/stats/summary
+	DirectConnections int   `json:"direct_connections"`
+	MEConnections     int   `json:"me_connections"`
+	HandshakeTimeouts int   `json:"handshake_timeouts"`
+	UptimeSeconds     int64 `json:"uptime_seconds"`
+
+	// From /v1/health
+	AcceptingConns bool `json:"accepting_connections"`
+	ReadOnly       bool `json:"read_only"`
+
+	// From /v1/stats/zero/all (upstream latency buckets)
+	LatLte100ms  int64 `json:"latency_lte_100ms"`
+	Lat101500ms  int64 `json:"latency_101_500ms"`
+	Lat5011000ms int64 `json:"latency_501_1000ms"`
+	LatGt1000ms  int64 `json:"latency_gt_1000ms"`
+
 }
 
 type EntryNode struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Hostname    string     `json:"hostname"`
-	Region      string     `json:"region"`
-	StatsPort   int        `json:"stats_port"`
-	Enabled     bool       `json:"enabled"`
-	Status      NodeStatus `json:"status"`
-	LastPolled  *time.Time `json:"last_polled_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	Hostname   string     `json:"hostname"`
+	Region     string     `json:"region"`
+	StatsPort  int        `json:"stats_port"`
+	Enabled    bool       `json:"enabled"`
+	Status     NodeStatus `json:"status"`
+	LastPolled *time.Time `json:"last_polled_at"`
+	CreatedAt  time.Time  `json:"created_at"`
 
 	// Cached metrics
-	CurrentSessions  int    `json:"current_sessions"`
-	TotalConnections int64  `json:"total_connections"`
-	BytesIn          int64  `json:"bytes_in"`
-	BytesOut         int64  `json:"bytes_out"`
-	BackendsUp       int    `json:"backends_up"`
-	BackendsDown     int    `json:"backends_down"`
+	CurrentSessions  int   `json:"current_sessions"`
+	TotalConnections int64 `json:"total_connections"`
+	BytesIn          int64 `json:"bytes_in"`
+	BytesOut         int64 `json:"bytes_out"`
+	BackendsUp       int   `json:"backends_up"`
+	BackendsDown     int   `json:"backends_down"`
 }
 
 type MetricSample struct {
@@ -67,6 +84,8 @@ type ClusterSummary struct {
 	AvgCoveragePct       float64 `json:"avg_coverage_pct"`
 	TotalBytesIn         int64   `json:"total_bytes_in"`
 	TotalBytesOut        int64   `json:"total_bytes_out"`
+	DirectConnections    int     `json:"direct_connections"`
+	MEConnections        int     `json:"me_connections"`
 }
 
 type TopologyNode struct {
@@ -75,7 +94,7 @@ type TopologyNode struct {
 	Type   string     `json:"type"` // "entry" or "backend"
 	Region string     `json:"region"`
 	Status NodeStatus `json:"status"`
-	Load   int        `json:"load"` // connections for backends, sessions for entries
+	Load   int        `json:"load"`
 }
 
 type TopologyEdge struct {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -84,55 +85,98 @@ func migrate() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_geo_sampled ON geo_snapshots (sampled_at);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Incremental migrations — add new columns to existing tables.
+	// SQLite does not support IF NOT EXISTS in ALTER TABLE, so we swallow
+	// "duplicate column" errors which means the column already exists.
+	for _, col := range []string{
+		"direct_connections INTEGER NOT NULL DEFAULT 0",
+		"me_connections INTEGER NOT NULL DEFAULT 0",
+		"handshake_timeouts INTEGER NOT NULL DEFAULT 0",
+		"uptime_seconds INTEGER NOT NULL DEFAULT 0",
+		"accepting_conns INTEGER NOT NULL DEFAULT 1",
+		"read_only INTEGER NOT NULL DEFAULT 0",
+		"lat_lte_100ms INTEGER NOT NULL DEFAULT 0",
+		"lat_101_500ms INTEGER NOT NULL DEFAULT 0",
+		"lat_501_1000ms INTEGER NOT NULL DEFAULT 0",
+		"lat_gt_1000ms INTEGER NOT NULL DEFAULT 0",
+	} {
+		addColumnIfMissing("backend_nodes", col)
+	}
+
+	return nil
+}
+
+func addColumnIfMissing(table, colDef string) {
+	_, err := DB.Exec("ALTER TABLE " + table + " ADD COLUMN " + colDef)
+	if err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		log.Printf("[db] migration warning (%s): %v", table, err)
+	}
 }
 
 // GetBackendNodes returns all backend nodes.
 func GetBackendNodes() ([]models.BackendNode, error) {
 	rows, err := DB.Query(`SELECT id,name,hostname,region,api_port,enabled,status,last_polled_at,created_at,
-		live_connections,coverage_pct,alive_writers,draining,bytes_in,bytes_out FROM backend_nodes ORDER BY created_at`)
+		live_connections,coverage_pct,alive_writers,draining,bytes_in,bytes_out,
+		direct_connections,me_connections,handshake_timeouts,uptime_seconds,
+		accepting_conns,read_only,lat_lte_100ms,lat_101_500ms,lat_501_1000ms,lat_gt_1000ms
+		FROM backend_nodes ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var nodes []models.BackendNode
 	for rows.Next() {
-		var n models.BackendNode
-		var enabled, draining int
-		var lastPolled sql.NullTime
-		err := rows.Scan(&n.ID, &n.Name, &n.Hostname, &n.Region, &n.APIPort, &enabled, &n.Status,
-			&lastPolled, &n.CreatedAt, &n.LiveConnections, &n.CoveragePct, &n.AliveWriters,
-			&draining, &n.BytesIn, &n.BytesOut)
+		n, err := scanBackendNode(rows)
 		if err != nil {
 			return nil, err
 		}
-		n.Enabled = enabled == 1
-		n.Draining = draining == 1
-		if lastPolled.Valid {
-			n.LastPolled = &lastPolled.Time
-		}
-		nodes = append(nodes, n)
+		nodes = append(nodes, *n)
 	}
 	return nodes, nil
 }
 
 func GetBackendNode(id string) (*models.BackendNode, error) {
-	row := DB.QueryRow(`SELECT id,name,hostname,region,api_port,enabled,status,last_polled_at,created_at,
-		live_connections,coverage_pct,alive_writers,draining,bytes_in,bytes_out FROM backend_nodes WHERE id=?`, id)
-	var n models.BackendNode
-	var enabled, draining int
-	var lastPolled sql.NullTime
-	err := row.Scan(&n.ID, &n.Name, &n.Hostname, &n.Region, &n.APIPort, &enabled, &n.Status,
-		&lastPolled, &n.CreatedAt, &n.LiveConnections, &n.CoveragePct, &n.AliveWriters,
-		&draining, &n.BytesIn, &n.BytesOut)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rows, err := DB.Query(`SELECT id,name,hostname,region,api_port,enabled,status,last_polled_at,created_at,
+		live_connections,coverage_pct,alive_writers,draining,bytes_in,bytes_out,
+		direct_connections,me_connections,handshake_timeouts,uptime_seconds,
+		accepting_conns,read_only,lat_lte_100ms,lat_101_500ms,lat_501_1000ms,lat_gt_1000ms
+		FROM backend_nodes WHERE id=?`, id)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	return scanBackendNode(rows)
+}
+
+func scanBackendNode(rows *sql.Rows) (*models.BackendNode, error) {
+	var n models.BackendNode
+	var enabled, draining, acceptingConns, readOnly int
+	var lastPolled sql.NullTime
+
+	err := rows.Scan(
+		&n.ID, &n.Name, &n.Hostname, &n.Region, &n.APIPort,
+		&enabled, &n.Status, &lastPolled, &n.CreatedAt,
+		&n.LiveConnections, &n.CoveragePct, &n.AliveWriters,
+		&draining, &n.BytesIn, &n.BytesOut,
+		&n.DirectConnections, &n.MEConnections, &n.HandshakeTimeouts, &n.UptimeSeconds,
+		&acceptingConns, &readOnly,
+		&n.LatLte100ms, &n.Lat101500ms, &n.Lat5011000ms, &n.LatGt1000ms,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	n.Enabled = enabled == 1
 	n.Draining = draining == 1
+	n.AcceptingConns = acceptingConns == 1
+	n.ReadOnly = readOnly == 1
 	if lastPolled.Valid {
 		n.LastPolled = &lastPolled.Time
 	}
@@ -147,12 +191,19 @@ func InsertBackendNode(n *models.BackendNode) error {
 }
 
 func UpdateBackendNode(n *models.BackendNode) error {
-	_, err := DB.Exec(`UPDATE backend_nodes SET name=?,hostname=?,region=?,api_port=?,enabled=?,status=?,
-		last_polled_at=?,live_connections=?,coverage_pct=?,alive_writers=?,draining=?,bytes_in=?,bytes_out=?
+	_, err := DB.Exec(`UPDATE backend_nodes SET
+		name=?,hostname=?,region=?,api_port=?,enabled=?,status=?,last_polled_at=?,
+		live_connections=?,coverage_pct=?,alive_writers=?,draining=?,bytes_in=?,bytes_out=?,
+		direct_connections=?,me_connections=?,handshake_timeouts=?,uptime_seconds=?,
+		accepting_conns=?,read_only=?,
+		lat_lte_100ms=?,lat_101_500ms=?,lat_501_1000ms=?,lat_gt_1000ms=?
 		WHERE id=?`,
-		n.Name, n.Hostname, n.Region, n.APIPort, boolInt(n.Enabled), string(n.Status),
-		n.LastPolled, n.LiveConnections, n.CoveragePct, n.AliveWriters, boolInt(n.Draining),
-		n.BytesIn, n.BytesOut, n.ID)
+		n.Name, n.Hostname, n.Region, n.APIPort, boolInt(n.Enabled), string(n.Status), n.LastPolled,
+		n.LiveConnections, n.CoveragePct, n.AliveWriters, boolInt(n.Draining), n.BytesIn, n.BytesOut,
+		n.DirectConnections, n.MEConnections, n.HandshakeTimeouts, n.UptimeSeconds,
+		boolInt(n.AcceptingConns), boolInt(n.ReadOnly),
+		n.LatLte100ms, n.Lat101500ms, n.Lat5011000ms, n.LatGt1000ms,
+		n.ID)
 	return err
 }
 

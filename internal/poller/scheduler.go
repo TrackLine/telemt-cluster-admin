@@ -66,6 +66,19 @@ func pollBackends() {
 				n.BytesOut = 0
 				n.Status = coverageStatus(mw.CoveragePct, mw.Draining)
 
+				// Extra stats — non-fatal
+				extra := FetchTelemetExtra(n.Hostname, n.APIPort)
+				n.DirectConnections = extra.DirectConnections
+				n.MEConnections = extra.MEConnections
+				n.HandshakeTimeouts = extra.HandshakeTimeouts
+				n.UptimeSeconds = extra.UptimeSeconds
+				n.AcceptingConns = extra.AcceptingConns
+				n.ReadOnly = extra.ReadOnly
+				n.LatLte100ms = extra.LatLte100ms
+				n.Lat101500ms = extra.Lat101500ms
+				n.Lat5011000ms = extra.Lat5011000ms
+				n.LatGt1000ms = extra.LatGt1000ms
+
 				// Record metric samples
 				for _, s := range []models.MetricSample{
 					{NodeID: n.ID, NodeType: "backend", MetricName: "live_connections", Value: float64(edge.LiveConnections), SampledAt: now},

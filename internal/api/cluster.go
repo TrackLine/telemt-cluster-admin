@@ -33,6 +33,8 @@ func ClusterSummary(c *gin.Context) {
 		sum.TotalLiveConnections += n.LiveConnections
 		sum.TotalBytesIn += n.BytesIn
 		sum.TotalBytesOut += n.BytesOut
+		sum.DirectConnections += n.DirectConnections
+		sum.MEConnections += n.MEConnections
 		if n.Enabled {
 			covSum += n.CoveragePct
 			covCount++

@@ -5,3 +5,4 @@ cluster-admin
 *.db
 .env
 .claude/
+.ansible/

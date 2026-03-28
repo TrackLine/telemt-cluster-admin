@@ -39,6 +39,8 @@ func parseHAProxyCSV(r io.Reader) (*haproxyStats, error) {
 	reader := csv.NewReader(r)
 	reader.Comment = '#'
 	reader.TrimLeadingSpace = true
+	reader.LazyQuotes = true
+	reader.FieldsPerRecord = -1
 
 	records, err := reader.ReadAll()
 	if err != nil {
