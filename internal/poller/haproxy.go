@@ -20,7 +20,7 @@ type haproxyStats struct {
 
 // FetchHAProxyStats fetches and parses HAProxy CSV stats from the stats endpoint.
 func FetchHAProxyStats(hostname string, port int) (*haproxyStats, error) {
-	url := fmt.Sprintf("http://%s:%d/stats?csv", hostname, port)
+	url := fmt.Sprintf("http://%s:%d/stats;csv;norefresh", hostname, port)
 	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
