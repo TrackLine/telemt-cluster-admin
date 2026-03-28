@@ -62,11 +62,16 @@ func FetchHAProxyStats(hostname string, port int) (*haproxyStats, error) {
 		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}
 
-	var items []haproxyStatItem
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+	var groups [][]haproxyStatItem
+	if err := json.NewDecoder(resp.Body).Decode(&groups); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
 	}
 
+	// Flatten into a single slice.
+	var items []haproxyStatItem
+	for _, g := range groups {
+		items = append(items, g...)
+	}
 	return parseHAProxyJSON(items)
 }
 
